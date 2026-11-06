@@ -102,6 +102,16 @@ jobs:
         run: |
           python3 tools/check_public_tree.py
           python3 -m unittest discover -s tests -p 'test_android_release_audit.py'
+      - name: Fetch Mojang's own 26.3 version file
+        # Mojang republished 26.3.json, so the copy Prepare reads no longer matches the pinned hash.
+        # Fetch the pinned file from Mojang and verify its SHA-1 before Prepare uses it.
+        run: |
+          set -euo pipefail
+          pin=$(python3 -c "import json; print(json.load(open('research-lock.json'))['minecraft']['manifest_sha1'])")
+          mkdir -p .local/minecraft/26.3
+          curl -fsSL --retry 3 -o .local/minecraft/26.3/manifest.json \
+            "https://piston-meta.mojang.com/v1/packages/${pin}/26.3.json"
+          echo "${pin}  .local/minecraft/26.3/manifest.json" | sha1sum -c -
       - name: Prepare private engine inputs from official downloads
         run: python3 tools/android_prepare.py --java-home "$JAVA_HOME"
       - name: Build optimized public dev APK
