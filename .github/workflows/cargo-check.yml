@@ -1,0 +1,47 @@
+# Type-check the workspace on every push to android-port. Acts as the compiler
+# for the main-to-Android port, since the port cannot be built on the author's device.
+name: Cargo check (android-port)
+
+on:
+  push:
+    branches: [android-port]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cargo-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libfontconfig-dev libvulkan-dev
+
+      - name: Toolchain
+        # rust-toolchain.toml pins the version; rustup installs it automatically.
+        run: |
+          rustup show
+          rustup component add clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check workspace
+        run: cargo check --workspace --all-targets --locked
+
+      - name: Clippy on Android-only crates
+        run: cargo clippy -p horizon-client -p horizon-client-render -p horizon-client-input --all-targets --locked -- -D warnings
